@@ -1,0 +1,34 @@
+find_program(RUBY_EXECUTABLE ruby)
+find_package(BISON REQUIRED)
+
+if (RUBY_EXECUTABLE)
+  message(STATUS "Found Ruby: ${RUBY_EXECUTABLE}")
+else()
+  message(SEND_ERROR "Ruby executable not found")
+endif()
+
+include(ExternalProject)
+ExternalProject_Add(mruby
+  PREFIX "${CMAKE_BINARY_DIR}/mruby"
+  DOWNLOAD_COMMAND ""
+  UPDATE_COMMAND ""
+  BUILD_IN_SOURCE 1
+  SOURCE_DIR "/opt/mruby"
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ${RUBY_EXECUTABLE} minirake
+    MRUBY_BUILD_DIR=${CMAKE_BINARY_DIR}/mruby
+    MRUBY_CONFIG=${CMAKE_SOURCE_DIR}/storage/mrbdb/mruby_build_config.rb
+  INSTALL_COMMAND "")
+include_directories("/opt/mruby/include")
+set(MRUBY_LIBRARIES "${CMAKE_BINARY_DIR}/mruby/lib/libmruby.a"
+  "${CMAKE_BINARY_DIR}/mruby/lib/libmruby_core.a")
+
+SET(MRBDB_PLUGIN_DYNAMIC "ha_mrbdb")
+SET(MRBDB_SOURCES ha_mrbdb.cc)
+ADD_DEFINITIONS(-DMYSQL_SERVER)
+IF(WITH_MRBDB_STORAGE_ENGINE AND NOT WITHOUT_MRBDB_STORAGE_ENGINE)
+  MYSQL_ADD_PLUGIN(mrbdb ${MRBDB_SOURCES} STORAGE_ENGINE DEFAULT)
+ELSEIF(NOT WITHOUT_MRBDB_STORAGE_ENGINE)
+  MYSQL_ADD_PLUGIN(mrbdb ${MRBDB_SOURCES} STORAGE_ENGINE MODULE_ONLY DEPENDENCIES mruby)
+  TARGET_LINK_LIBRARIES(mrbdb m ${MRUBY_LIBRARIES})
+ENDIF()
